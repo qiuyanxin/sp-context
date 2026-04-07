@@ -1,0 +1,13 @@
+{
+  "name": "sp-context",
+  "version": "1.2.0",
+  "description": "Company knowledge management plugin — progressive context loading, knowledge quality engine, claude-mem integration",
+  "author": "springbrand-lab",
+  "homepage": "https://github.com/springbrand-lab/sp-context-plugin",
+  "keywords": [
+    "knowledge-management",
+    "context",
+    "claude-mem-integration",
+    "knowledge-quality"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "sp-context",
+  "version": "1.0.0",
+  "description": "Give every AI agent persistent memory of your team's knowledge. CLI + Git, no vector DB needed.",
+  "type": "module",
+  "bin": {
+    "sp": "src/cli.ts"
+  },
+  "scripts": {
+    "build": "bun build src/cli.ts --outdir dist --target bun --compile --outfile dist/sp && bun build src/http.ts --outdir dist --target bun --entry-naming http.js",
+    "dev": "bun run src/cli.ts",
+    "dev:http": "bun run src/http.ts",
+    "index": "bun run src/index-builder.ts"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "gray-matter": "^4.0.3",
+    "minisearch": "^7.2.0",
+    "simple-git": "^3.27.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/express": "^5.0.6",
+    "typescript": "^5.7.0"
+  }
+}
