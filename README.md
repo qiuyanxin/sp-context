@@ -4,7 +4,7 @@ Your AI agent starts every session knowing nothing about your team. This fixes t
 
 **sp-context** is a CLI that gives any AI coding agent (Claude Code, Codex, Cursor, etc.) persistent access to your team's knowledge — decisions, architecture, playbooks, lessons learned — through a simple Git repo.
 
-No vector database. No embeddings. No RAG pipeline. Just Git + BM25 + 114 tokens per session.
+No vector database. No embeddings. No RAG pipeline. Just Git + BM25 + ~90 tokens per session.
 
 ![demo](assets/demo.png)
 
@@ -97,7 +97,7 @@ sp config list|add|switch                # Manage multiple repos
 ### Progressive Loading (saves tokens)
 
 ```
-Session start  → Tier 0: hook injects directory overview (~114 tokens)
+Session start  → Tier 0: hook injects directory overview (~~90 tokens)
 On-demand      → Tier 1: sp search returns summaries (~95 tokens/hit)
 Deep read      → Tier 2: sp get loads full document
 ```
