@@ -17,7 +17,7 @@ A CLI tool that connects your AI coding agents (Claude Code, Codex, Cursor, etc.
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/springbrand-lab/sp-context-plugin.git ~/sp-context-plugin
+git clone https://github.com/qiuyanxin/sp-context.git ~/sp-context-plugin
 cd ~/sp-context-plugin && bun install
 ```
 

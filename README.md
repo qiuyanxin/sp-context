@@ -27,7 +27,7 @@ Claude Code / Codex / Any Agent  ──  Bash  ──▶  sp CLI  ──▶  Git
 
 ```bash
 # 1. Install
-git clone https://github.com/springbrand-lab/sp-context-plugin.git ~/sp-context-plugin
+git clone https://github.com/qiuyanxin/sp-context.git ~/sp-context-plugin
 cd ~/sp-context-plugin && bun install
 
 # 2. Initialize your knowledge repo

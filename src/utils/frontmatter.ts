@@ -63,7 +63,7 @@ function inferDate(filePath: string, fullPath: string): string | undefined {
 }
 
 function inferProject(filePath: string): string | undefined {
-  // Try to extract from path like plans/lafe-xxx or product-analysis/meowant
+  // Try to extract project name from path like plans/project-xxx or clients/project-name
   const parts = filePath.split("/");
   if (parts.length >= 2) {
     const dirName = parts[1] ?? parts[0];
