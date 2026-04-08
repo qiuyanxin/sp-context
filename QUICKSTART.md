@@ -21,7 +21,15 @@ git clone https://github.com/qiuyanxin/sp-context.git ~/sp-context-plugin
 cd ~/sp-context-plugin && bun install
 ```
 
-### 2. Set up the sp command
+### 2. Set up the `sp` command
+
+**Option A (recommended):** link the CLI globally after `bun install`:
+
+```bash
+cd ~/sp-context-plugin && bun link
+```
+
+**Option B:** shell alias:
 
 ```bash
 echo 'alias sp="bun run ~/sp-context-plugin/src/cli.ts"' >> ~/.zshrc
@@ -85,17 +93,11 @@ Add to `~/.claude/settings.json`:
 
 ### Verify hooks
 
-Start Claude Code. You should see something like:
+Start Claude Code. You should see a short catalog overview (doc counts per folder, last updated).
 
-```
-Knowledge base (12 docs, last updated 2026-04-07)
-- context/ (3 docs) — Company, Tech Stack, Glossary
-- decisions/ (0 docs)
-- experience/ (0 docs)
-...
-```
+If you install via the **Claude Code plugin** marketplace, hooks use `${CLAUDE_PLUGIN_ROOT}` automatically (`hooks/hooks.json`). The JSON above is for a **manual** clone at `$HOME/sp-context-plugin`.
 
-If you see this, you're set.
+If you see the overview, you're set.
 
 ## Daily Usage
 
@@ -112,7 +114,7 @@ If you see this, you're set.
 ```bash
 # Search
 sp search "authentication"
-sp search "MVP" --type decision
+sp search "MVP" --type decision --tags infra --limit 5
 
 # Read
 sp get context/company.md
@@ -120,10 +122,16 @@ sp get context/company.md
 # Browse
 sp list context
 sp list decisions
+sp list clients    # client/account folders under clients/
 
 # Write
 sp push --title "Redis caching lesson" --type learning \
   --tags "redis,cache" --content "Connection pools must set maxRetries..."
+sp push --title "Notes" --type personal --category notes --content "…"
+
+# Import from claude-mem (needs claude-mem plugin + local DB)
+sp import --query "onboarding" --limit 10
+# sp import --ids 101,102
 
 # Sync with team
 sp sync
@@ -154,12 +162,15 @@ When pushing knowledge, specify `--type`:
 | `meeting` | Meeting notes | `meetings/` |
 | `status` | Plans, progress, weekly updates | `plans/` |
 | `playbook` | SOPs, workflows | `playbook/` |
+| `personal` | Private notes under `people/` | `people/` (optional `--category` e.g. `notes`, `drafts`) |
+
+**Browse with `sp list`:** `context`, `decisions`, `experience`, `meetings`, `plans`, `playbook`, **`clients`**, `people`. Use `--project <name>` when docs are grouped by project.
 
 ## FAQ
 
 **Q: `sp` command not found?**
 
-Run `source ~/.zshrc`, or directly: `bun run ~/sp-context-plugin/src/cli.ts --version`.
+Run `cd ~/sp-context-plugin && bun link`, or `source ~/.zshrc` if you use an alias, or run `bun run ~/sp-context-plugin/src/cli.ts --version`.
 
 **Q: Search returns no results?**
 
@@ -176,15 +187,29 @@ cd ~/my-team-context && git remote -v
 
 Each machine installs independently. `sp push` auto-commits and pushes. `sp sync` pulls latest. Git handles the rest.
 
+**Q: `sp import` errors or does nothing?**
+
+`sp import` reads the local **claude-mem** database. Install the claude-mem plugin and ensure `~/.claude-mem/claude-mem.db` exists. For batch workflows, use the `/sp-context:sp-harvest` skill in Claude Code.
+
+## Claude Code skills (plugin)
+
+- `/sp-context:sp-setup` — dependencies and install checklist  
+- `/sp-context:sp-quick` — quick capture  
+- `/sp-context:sp-harvest` — claude-mem → sp-context  
+- `/sp-context:sp-health` — doctor-style quality pass  
+
 ## Self-Hosting Sync Server (optional)
 
 For teams wanting instant sync:
 
 ```bash
-SP_CONTEXT_REPO=~/my-team-context \
-SP_API_KEY="your-secret" \
-PORT=3100 \
+cd ~/sp-context-plugin   # repository root
+export SP_CONTEXT_REPO=~/my-team-context
+export SP_API_KEY="your-secret"   # optional; see below
+export PORT=3100
 bun run src/http.ts
 ```
 
 Health check: `curl -s http://localhost:3100/health`
+
+**`SP_API_KEY`:** Used **only** by the small HTTP service (`src/http.ts`), not by the `sp` CLI. You define it yourself (e.g. `openssl rand -hex 32`). When set, `POST /sync` requires `Authorization: Bearer <that value>`. When unset, `/sync` has no Bearer check—OK on localhost, risky if the port is public. **`SP_WEBHOOK_SECRET`** is separate: it validates GitHub signatures on **`POST /webhook`** only. Details: README → *Self-Hosting Sync Server*.

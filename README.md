@@ -4,7 +4,7 @@ Your AI agent starts every session knowing nothing about your team. This fixes t
 
 **sp-context** is a CLI that gives any AI coding agent (Claude Code, Codex, Cursor, etc.) persistent access to your team's knowledge — decisions, architecture, playbooks, lessons learned — through a simple Git repo.
 
-No vector database. No embeddings. No RAG pipeline. Just Git + BM25 + ~90 tokens per session.
+No vector database. No embeddings. No RAG pipeline. Just Git + BM25 + about 100 tokens per session for the catalog overview.
 
 ![demo](assets/demo.png)
 
@@ -20,7 +20,7 @@ No vector database. No embeddings. No RAG pipeline. Just Git + BM25 + ~90 tokens
 | Complex infra to maintain | `bun install` and done |
 | Costs money at scale | Free forever |
 
-**The 114-token trick**: On session start, a hook injects a ~114 token directory overview. Your agent knows what knowledge exists without loading it all. It pulls full docs on demand via `sp get`.
+**Progressive loading**: On session start, a hook injects a short directory overview (on the order of ~100 tokens). Your agent knows what knowledge exists without loading it all. It pulls full docs on demand via `sp get`.
 
 ## Quick Start
 
@@ -33,9 +33,9 @@ cd ~/sp-context-plugin && bun install
 sp init ~/my-team-context
 # Creates a Git repo with starter templates: company mission, tech stack, glossary
 
-# 3. Set up the CLI
-echo 'alias sp="bun run ~/sp-context-plugin/src/cli.ts"' >> ~/.zshrc
-source ~/.zshrc
+# 3. Put `sp` on your PATH (pick one)
+cd ~/sp-context-plugin && bun link          # recommended: global `sp` command
+# or: echo 'alias sp="bun run ~/sp-context-plugin/src/cli.ts"' >> ~/.zshrc && source ~/.zshrc
 
 # 4. Verify
 sp --version
@@ -68,24 +68,31 @@ Now every Claude Code session starts with your team's context automatically load
 ```bash
 # ── Read ──
 sp search <query>                        # BM25 + CJK search
-sp search <query> --mode or              # OR mode (any term matches)
-sp search <query> --snippet              # Show keyword context
+sp search <query> --type <t> --tags a,b  # Filter by type / tags
+sp search <query> --limit 20 --mode or   # Max hits; OR = any term matches
+sp search <query> --snippet              # Keyword context snippets
 sp get <path>                            # Read full document
-sp list <category>                       # Browse by directory
+sp list <category> [--project <name>]      # Browse: context, decisions, …, clients, people
 
 # ── Write ──
 sp push --title <t> --type <type> --content <text>   # Add knowledge (auto-dedup)
-sp push --title <t> --type status --ttl 30d          # With TTL, expires in 30 days
+sp push --title <t> --type <type> --file <path>      # Body from file (or stdin)
+sp push --title <t> --type status --ttl 30d          # TTL → expiry in frontmatter
+sp push --title <t> --type personal --category notes # people/ sub-folder (research, drafts, notes)
+
+# ── Claude-mem ──
+sp import --query "auth" --limit 20                  # Search observations → import
+sp import --ids 101,102                                # Import by observation IDs
 
 # ── Governance ──
 sp doctor                                # Quality check (duplicates, stale, broken links)
 sp schema                                # Introspect types, tags, stats
-sp gc [--yes]                            # Archive expired docs
+sp gc [--yes|-y]                         # Archive expired docs
 
 # ── File ops ──
-sp add <file|dir> [--to <path>]          # Add local files to knowledge repo
-sp delete <path>                         # Delete document
-sp move <path> --to <dir>                # Move document
+sp add <file|dir> [--to <path>] [--yes]  # Add local files to knowledge repo
+sp delete <path>                         # Delete document (alias: sp rm)
+sp move <path> --to <dir>                # Move document (alias: sp mv)
 
 # ── Sync ──
 sp sync                                  # Pull + rebuild index
@@ -97,7 +104,7 @@ sp config list|add|switch                # Manage multiple repos
 ### Progressive Loading (saves tokens)
 
 ```
-Session start  → Tier 0: hook injects directory overview (~~90 tokens)
+Session start  → Tier 0: hook injects directory overview (~100 tokens)
 On-demand      → Tier 1: sp search returns summaries (~95 tokens/hit)
 Deep read      → Tier 2: sp get loads full document
 ```
@@ -120,7 +127,9 @@ Deep read      → Tier 2: sp get loads full document
 | `meeting` | `meetings/` | Meeting notes |
 | `status` | `plans/` | Plans, progress, weekly updates |
 | `playbook` | `playbook/` | SOPs, workflows |
-| `personal` | `people/` | Personal workspace |
+| `personal` | `people/` | Personal workspace (optional `--category` for sub-folders) |
+
+`sp list` uses the same top-level folders plus **`clients`** (`clients/`) for account- or client-scoped docs (files still use normal frontmatter `type`).
 
 ### Document Links
 
@@ -161,25 +170,45 @@ TTY → human-readable output. Pipe → auto JSON. `--json` → force JSON.
 
 ## Claude Code Skills
 
-If installed as a Claude Code plugin, four skills are available:
+If installed as a Claude Code plugin, four skills are available (slash commands use the plugin namespace):
 
-- `/sp-setup` — Check dependencies and guide installation
-- `/sp-quick` — Low-friction one-line knowledge capture (AI auto-infers type/tags)
-- `/sp-harvest` — Batch sync high-value knowledge from claude-mem
-- `/sp-health` — Knowledge quality check + auto-fix
+- `/sp-context:sp-setup` — Check dependencies and guide installation
+- `/sp-context:sp-quick` — Low-friction one-line knowledge capture (AI auto-infers type/tags)
+- `/sp-context:sp-harvest` — Batch sync high-value knowledge from claude-mem
+- `/sp-context:sp-health` — Knowledge quality check + auto-fix
 
 ## Self-Hosting Sync Server
 
 For team sync beyond Git push/pull:
 
 ```bash
-SP_CONTEXT_REPO=~/my-team-context \
-SP_API_KEY="your-secret" \
-PORT=3100 \
+cd ~/sp-context-plugin   # or your clone path
+export SP_CONTEXT_REPO=~/my-team-context
+export SP_API_KEY="your-secret"           # optional; see below
+export SP_WEBHOOK_SECRET="github-secret"  # optional; verify GitHub X-Hub-Signature-256 on /webhook
+export PORT=3100
 bun run src/http.ts
 ```
 
-Supports GitHub webhooks (instant sync), built-in cron (5 min), and sync-on-startup.
+**Endpoints:** `GET /health` — liveness; `POST /webhook` — GitHub `push` (optional HMAC via `SP_WEBHOOK_SECRET`); `POST /sync` — trigger pull + index rebuild. A 5-minute timer and startup also call the same sync logic.
+
+### Environment: `SP_API_KEY` vs `SP_WEBHOOK_SECRET`
+
+| Variable | Who sets it | What it protects |
+|----------|-------------|------------------|
+| **`SP_API_KEY`** | You (any strong random string; the project does not generate it). Example: `openssl rand -hex 32` | Only **`POST /sync`**. If set, clients must send `Authorization: Bearer <same value>`. If **unset**, `/sync` accepts requests without that header (fine for local dev; **do not** expose that to the internet). |
+| **`SP_WEBHOOK_SECRET`** | Same idea — you copy GitHub’s webhook “Secret” into this env var | Only **`POST /webhook`** signature verification (`X-Hub-Signature-256`). Unrelated to `SP_API_KEY`. |
+
+**Example** (with `SP_API_KEY` set):
+
+```bash
+curl -s -X POST http://localhost:3100/sync \
+  -H "Authorization: Bearer your-secret" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+The `sp` CLI does **not** read `SP_API_KEY`; it is only for the optional HTTP sync server.
 
 ## Requirements
 
